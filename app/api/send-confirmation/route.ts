@@ -3,28 +3,36 @@ import { NextResponse } from 'next/server';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 export async function POST(request: Request) {
-    try {
-        const body = await request.json();
-        const {
-            clientName,
-            clientEmail,
-            professionalName,
-            professionalEmail,
-            serviceName,
-            datetime,
-            price,
-            appointmentId
-        } = body;
+  try {
+    const body = await request.json();
 
-        const appointmentDate = parseISO(datetime);
-        const formattedDate = format(appointmentDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
-        const formattedTime = format(appointmentDate, "HH:mm");
+    // Si no hay API key, solo registrar en consola (modo dev)
+    if (!resend) {
+      console.log('Resend API key not configured. Email would be sent to:', body.clientEmail);
+      return NextResponse.json({ success: true, dev_mode: true });
+    }
+    const {
+      clientName,
+      clientEmail,
+      professionalName,
+      professionalEmail,
+      serviceName,
+      datetime,
+      price,
+      appointmentId
+    } = body;
 
-        // Email al cliente
-        const clientEmailHtml = `
+    const appointmentDate = parseISO(datetime);
+    const formattedDate = format(appointmentDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+    const formattedTime = format(appointmentDate, "HH:mm");
+
+    // Email al cliente
+    const clientEmailHtml = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -100,8 +108,8 @@ export async function POST(request: Request) {
       </html>
     `;
 
-        // Email al profesional
-        const professionalEmailHtml = `
+    // Email al profesional
+    const professionalEmailHtml = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -173,28 +181,28 @@ export async function POST(request: Request) {
       </html>
     `;
 
-        // Enviar email al cliente
-        await resend.emails.send({
-            from: 'BookFlow <onboarding@resend.dev>', // Cambiar después por tu dominio
-            to: [clientEmail],
-            subject: '✅ Confirmación de Cita - BookFlow',
-            html: clientEmailHtml,
-        });
+    // Enviar email al cliente
+    await resend.emails.send({
+      from: 'BookFlow <onboarding@resend.dev>', // Cambiar después por tu dominio
+      to: [clientEmail],
+      subject: '✅ Confirmación de Cita - BookFlow',
+      html: clientEmailHtml,
+    });
 
-        // Enviar email al profesional
-        await resend.emails.send({
-            from: 'BookFlow <onboarding@resend.dev>',
-            to: [professionalEmail],
-            subject: '📅 Nueva Cita Registrada - BookFlow',
-            html: professionalEmailHtml,
-        });
+    // Enviar email al profesional
+    await resend.emails.send({
+      from: 'BookFlow <onboarding@resend.dev>',
+      to: [professionalEmail],
+      subject: '📅 Nueva Cita Registrada - BookFlow',
+      html: professionalEmailHtml,
+    });
 
-        return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error('Error sending email:', error);
-        return NextResponse.json(
-            { error: 'Error al enviar emails' },
-            { status: 500 }
-        );
-    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return NextResponse.json(
+      { error: 'Error al enviar emails' },
+      { status: 500 }
+    );
+  }
 }
